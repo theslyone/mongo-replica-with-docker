@@ -1,9 +1,10 @@
 function switchToServer {
-  env='docker-machine env '$1
   echo '···························'
   echo '·· swtiching >>>> '$1' server ··'
   echo '···························'
-  eval $($env)
+  #env='docker-machine env '$1
+  #eval $($env)
+  docker-machine ssh $1
 }
 
 function removeContainer {
@@ -12,6 +13,6 @@ function removeContainer {
   docker volume rm $(docker volume ls -qf dangling=true)
 }
 
-removeContainer manager1 mongoNode1
-removeContainer worker1 mongoNode2
-removeContainer worker2 mongoNode3
+removeContainer master01 mongoNode01
+removeContainer worker01 mongoNode02
+removeContainer worker02 mongoNode03

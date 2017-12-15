@@ -1,6 +1,6 @@
 rs.initiate({
  _id: 'rs1',
  members: [{
-  _id: 0, host: 'manager1:27017'
+  _id: 0, host: 'master01:27017'
  }]
 })

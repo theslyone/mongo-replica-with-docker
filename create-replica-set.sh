@@ -1,7 +1,7 @@
 function howManyServers {
   arg=''
   c=0
-  for server in manager1 worker1 worker2
+  for server in master01 worker01 worker02
   do
       cmd='docker-machine ip '$server
       arg=$arg' --add-host '${server}':'$($cmd)
@@ -11,11 +11,12 @@ function howManyServers {
 }
 
 function switchToServer {
-  env='docker-machine env '$1
   echo '···························'
   echo '·· swtiching >>>> '$1' server ··'
   echo '···························'
-  eval $($env)
+  #env='docker-machine env '$1
+  #eval $($env)
+  docker-machine ssh $1
 }
 
 function startReplicaSet {
@@ -111,7 +112,7 @@ function createMongoDBNode {
   removeAndCreateContainer $2 $3
 
   # verify if container is ready
-  wait_for_databases 'manager1'
+  wait_for_databases 'master01'
 
   echo '·······························'
   echo '·  CONTAINER '$1' CREATED ··'
@@ -136,12 +137,12 @@ function wait_for {
 }
 
 function wait_for_databases {
-  if [[ ($1 == 'manager1') ]]; then
-    ip=$(docker-machine ip manager1)
-  elif [[ $1 == 'worker1' ]]; then
-    ip=$(docker-machine ip worker1)
-  elif [[ $1 == 'worker2' ]]; then
-    ip=$(docker-machine ip worker2)
+  if [[ ($1 == 'master01') ]]; then
+    ip=$(docker-machine ip master01)
+  elif [[ $1 == 'worker01' ]]; then
+    ip=$(docker-machine ip worker01)
+  elif [[ $1 == 'worker02' ]]; then
+    ip=$(docker-machine ip worker02)
   fi
   # make tcp call
   echo "IP == $ip PORT == 27017"
@@ -159,7 +160,7 @@ function add_replicas {
 
   switchToServer $1
   # add nuppdb replicas
-  for server in worker1 worker2
+  for server in worker01 worker02
   do
     rs="rs.add('$server:27017')"
     add='mongo --eval "'$rs'" -u $MONGO_REPLICA_ADMIN -p $MONGO_PASS_REPLICA --authenticationDatabase="admin"'
@@ -175,16 +176,16 @@ function init_replica_set {
   docker exec -i $1 bash -c 'mongo < /data/admin/admin.js'
   cmd='mongo -u $MONGO_REPLICA_ADMIN -p $MONGO_PASS_REPLICA --eval "rs.status()" --authenticationDatabase "admin"'
   sleep 2
-  docker exec -i mongoNode1 bash -c "$cmd"
+  docker exec -i mongoNode01 bash -c "$cmd"
 }
 
 function init_mongo_primary {
   # @params name-of-keyfile
   createKeyFile mongo-keyfile
   # @params server container volume
-  createMongoDBNode manager1 mongoNode1 mongo_storage
+  createMongoDBNode master01 mongoNode01 mongo_storage
   # @params container
-  init_replica_set mongoNode1
+  init_replica_set mongoNode01
   echo '·······························'
   echo '·  REPLICA SET READY TO ADD NODES ··'
   echo '·······························'
@@ -192,8 +193,8 @@ function init_mongo_primary {
 
 function init_mongo_secondaries {
   # @Params server container volume
-  createMongoDBNode worker1 mongoNode2 mongo_storage
-  createMongoDBNode worker2 mongoNode3 mongo_storage
+  createMongoDBNode worker01 mongoNode02 mongo_storage
+  createMongoDBNode worker02 mongoNode03 mongo_storage
 }
 
 # @params server primary-mongo-container
@@ -204,16 +205,16 @@ function check_status {
 }
 
 function add_moviesdb_test {
-  docker exec -i mongoNode1 bash -c 'mongo -u $MONGO_USER_ADMIN -p $MONGO_PASS_ADMIN --authenticationDatabase "admin" < /data/admin/grantRole.js'
+  docker exec -i mongoNode01 bash -c 'mongo -u $MONGO_USER_ADMIN -p $MONGO_PASS_ADMIN --authenticationDatabase "admin" < /data/admin/grantRole.js'
   sleep 1
-  docker exec -i mongoNode1 bash -c 'mongo -u $MONGO_USER_ADMIN -p $MONGO_PASS_ADMIN --authenticationDatabase "admin" < /data/admin/movies.js'
+  docker exec -i mongoNode01 bash -c 'mongo -u $MONGO_USER_ADMIN -p $MONGO_PASS_ADMIN --authenticationDatabase "admin" < /data/admin/movies.js'
 }
 
 function main {
   init_mongo_primary
   init_mongo_secondaries
-  add_replicas manager1 mongoNode1
-  check_status manager1 mongoNode1
+  add_replicas master01 mongoNode01
+  check_status master01 mongoNode01
   add_moviesdb_test
 }
 
